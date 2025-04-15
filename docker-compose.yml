@@ -1,45 +1,57 @@
-version: '3.8'
-
 services:
-  db:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: annotation
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5433:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  backend:
+  annotation-backend:
     build: 
-      context: ./annotation-backend-tfc
-    environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/annotation
-      SYNC_DATABASE_URL: postgresql://postgres:postgres@db:5432/annotation
-      SECRET_KEY: "your-secret-key-here"  # Change this in production
-      CORS_ORIGINS: '["http://localhost:3001"]'
+      context: ./annotation-backend-copy
+      dockerfile: Dockerfile
     ports:
-      - "8001:8000"
+      - "8000:8000"
+    volumes:
+      - ./annotation-backend-copy:/app
+      - ./uploads:/app/uploads
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/annotation
+      - CORS_ORIGINS=["http://localhost:3000", "http://annotation-admin-ui", "http://localhost:3001", "http://annotation-ui"]
     depends_on:
-      db:
-        condition: service_healthy
+      - db 
 
-  admin-ui:
+  annotation-admin-ui:
     build:
-      context: ./admin-ui
-      args:
-        VITE_API_URL: http://localhost:8001
+      context: ./annotation-admin-ui-copy
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    volumes:
+      - ./annotation-admin-ui-copy:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://annotation-backend:8000
+    depends_on:
+      - annotation-backend
+
+  annotation-ui:
+    build:
+      context: ./annotation-ui
+      dockerfile: Dockerfile
     ports:
       - "3001:80"
+    volumes:
+      - ./annotation-ui:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000
     depends_on:
-      - backend
+      - annotation-backend
+
+  db:
+    image: postgres:15
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=annotation
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
 volumes:
   postgres_data: 

@@ -27,8 +27,6 @@ class Project(Base):
     name: Mapped[str] = mapped_column(String)
     type: Mapped[str] = mapped_column(String)  # e.g., "chat_disentanglement"
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    # Commented out temporarily - needs migration
-    # meta_data: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     
     # Relationships
@@ -81,138 +79,51 @@ class DataItem(Base):
         "polymorphic_identity": "generic",
         "polymorphic_on": "type",
     }
-    
-    # Helper methods for accessing metadata fields
-    def get_meta(self, key, default=None):
-        """Get a metadata field with a default value if not found"""
-        return self.meta_data.get(key, default)
-    
-    def set_meta(self, key, value):
-        """Set a metadata field"""
-        if not self.meta_data:
-            self.meta_data = {}
-        self.meta_data[key] = value
-
-    # Factory method to create a DataItem of the appropriate type
-    @classmethod
-    def create(cls, type_name, container_id, content, meta_data=None):
-        """Create a DataItem object of the appropriate type"""
-        if meta_data is None:
-            meta_data = {}
-        
-        # Create the base DataItem with the right type
-        return cls(
-            type=type_name,
-            container_id=container_id,
-            content=content,
-            meta_data=meta_data
-        )
-        
-    # Common field accessors
-    @property
-    def title(self) -> Optional[str]:
-        """Get the title from metadata"""
-        return self.get_meta("title")
-    
-    @title.setter
-    def title(self, value: str):
-        """Set the title in metadata"""
-        self.set_meta("title", value)
-        
-    @property
-    def category(self) -> Optional[str]:
-        """Get the category from metadata"""
-        return self.get_meta("category")
-    
-    @category.setter
-    def category(self, value: str):
-        """Set the category in metadata"""
-        self.set_meta("category", value)
-        
-    @property
-    def tags(self) -> Optional[Dict[str, Any]]:
-        """Get the tags from metadata"""
-        return self.get_meta("tags")
-    
-    @tags.setter
-    def tags(self, value: Dict[str, Any]):
-        """Set the tags in metadata"""
-        self.set_meta("tags", value)
-        
-    @property
-    def source(self) -> Optional[str]:
-        """Get the source from metadata"""
-        return self.get_meta("source")
-    
-    @source.setter
-    def source(self, value: str):
-        """Set the source in metadata"""
-        self.set_meta("source", value)
-        
-    # Type-specific field accessors
-    def is_type(self, type_name):
-        """Check if this item is of a specific type"""
-        return self.type == type_name
-    
-    # Chat message specific fields
-    @property
-    def turn_id(self) -> Optional[str]:
-        """Get the turn ID from metadata"""
-        return self.get_meta("turn_id")
-    
-    @turn_id.setter
-    def turn_id(self, value: str):
-        """Set the turn ID in metadata"""
-        self.set_meta("turn_id", value)
-    
-    @property
-    def user_id(self) -> Optional[str]:
-        """Get the user ID from metadata"""
-        return self.get_meta("user_id")
-    
-    @user_id.setter
-    def user_id(self, value: str):
-        """Set the user ID in metadata"""
-        self.set_meta("user_id", value)
-    
-    @property
-    def reply_to_turn(self) -> Optional[str]:
-        """Get the reply-to turn ID from metadata"""
-        return self.get_meta("reply_to_turn")
-    
-    @reply_to_turn.setter
-    def reply_to_turn(self, value: str):
-        """Set the reply-to turn ID in metadata"""
-        self.set_meta("reply_to_turn", value)
-    
-    @property
-    def timestamp(self) -> Optional[datetime]:
-        """Get the message timestamp from metadata"""
-        return self.get_meta("timestamp")
-    
-    @timestamp.setter
-    def timestamp(self, value: datetime):
-        """Set the message timestamp in metadata"""
-        self.set_meta("timestamp", value)
 
 
-# Legacy compatibility layer for specialized data item types
 class ImportedData(DataItem):
-    """Compatibility layer for ImportedData.
-    All fields now stored in meta_data of parent DataItem.
-    """
+    __tablename__ = "imported_data_items"
+    
+    id: Mapped[int] = mapped_column(ForeignKey("data_items.id"), primary_key=True)
+    title: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    category: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    tags: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
+    source: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # e.g., "csv_import", "manual", etc.
+
     __mapper_args__ = {
         "polymorphic_identity": "imported_data",
     }
 
 
 class ChatMessage(DataItem):
-    """Compatibility layer for ChatMessage.
-    All fields now stored in meta_data of parent DataItem.
-    """
+    """Chat message data item with specific chat fields"""
+    __tablename__ = "chat_messages"
+    
+    id: Mapped[int] = mapped_column(ForeignKey("data_items.id"), primary_key=True)
+    
     __mapper_args__ = {
         "polymorphic_identity": "chat_message",
     }
+    
+    @property
+    def turn_id(self) -> str:
+        """Get the turn ID from metadata"""
+        return str(self.meta_data.get("turn_id", self.id))
+    
+    @property
+    def user_id(self) -> str:
+        """Get the user ID from metadata"""
+        return str(self.meta_data.get("user_id", "unknown"))
+    
+    @property
+    def reply_to_turn(self) -> Optional[str]:
+        """Get the reply-to turn ID from metadata"""
+        return self.meta_data.get("reply_to_turn")
+    
+    @property
+    def timestamp(self) -> Optional[datetime]:
+        """Get the message timestamp from metadata"""
+        return self.meta_data.get("timestamp")
 
 
 class Annotation(Base):

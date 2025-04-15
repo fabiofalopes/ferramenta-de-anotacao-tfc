@@ -1,0 +1,4 @@
+venv/
+uploads/
+prompts/
+__pycache__/

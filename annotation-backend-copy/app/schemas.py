@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, constr
 from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 from enum import Enum
@@ -18,7 +18,6 @@ class ProjectBase(BaseModel):
     name: str
     type: str
     description: Optional[str] = None
-    meta_data: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
 
 class DataContainerBase(BaseModel):
@@ -30,18 +29,21 @@ class DataContainerBase(BaseModel):
 class DataItemBase(BaseModel):
     content: str
     meta_data: Dict[str, Any] = Field(default_factory=dict)
+    type: str = "generic"
 
 
-class ImportedDataBase(BaseModel):
+class ImportedDataBase(DataItemBase):
+    type: Literal["imported_data"] = "imported_data"
     title: Optional[str] = None
     category: Optional[str] = None
     tags: Optional[Dict[str, Any]] = None
     source: Optional[str] = None
 
 
-class ChatMessageBase(BaseModel):
-    turn_id: str
-    user_id: str
+class ChatMessageBase(DataItemBase):
+    type: Literal["chat_message"] = "chat_message"
+    turn_id: Optional[str] = None
+    user_id: Optional[str] = None
     turn_text: Optional[str] = None
     timestamp: Optional[datetime] = None
     reply_to_turn: Optional[str] = None
@@ -53,8 +55,8 @@ class AnnotationBase(BaseModel):
 
 
 class ThreadAnnotationBase(AnnotationBase):
-    thread_id: str
-    confidence: Optional[float] = None
+    thread_id: constr(min_length=1, pattern=r'^[a-zA-Z0-9_-]+$') = Field(..., description="Thread ID must be at least 1 characters long and contain only letters, numbers, underscores, and hyphens")
+    confidence: Optional[float] = Field(None, ge=0.0, le=1.0, description="Confidence value between 0 and 1")
     notes: Optional[str] = None
 
 
@@ -74,7 +76,6 @@ class DataContainerCreate(DataContainerBase):
 
 class DataItemCreate(DataItemBase):
     container_id: int
-    type: str = "generic"
 
 
 class ImportedDataCreate(DataItemCreate):
@@ -83,15 +84,55 @@ class ImportedDataCreate(DataItemCreate):
     category: Optional[str] = None
     tags: Optional[Dict[str, Any]] = None
     source: Optional[str] = None
+    
+    def to_data_item(self) -> Dict[str, Any]:
+        """Convert to base DataItem with appropriate metadata"""
+        meta_data = self.meta_data or {}
+        if self.title is not None:
+            meta_data["title"] = self.title
+        if self.category is not None:
+            meta_data["category"] = self.category
+        if self.tags is not None:
+            meta_data["tags"] = self.tags
+        if self.source is not None:
+            meta_data["source"] = self.source
+            
+        return {
+            "container_id": self.container_id,
+            "content": self.content,
+            "type": self.type,
+            "meta_data": meta_data
+        }
 
 
 class ChatMessageCreate(DataItemCreate):
     type: Literal["chat_message"] = "chat_message"
-    turn_id: str
-    user_id: str
+    turn_id: Optional[str] = None
+    user_id: Optional[str] = None
     turn_text: Optional[str] = None
     timestamp: Optional[datetime] = None
     reply_to_turn: Optional[str] = None
+    
+    def to_data_item(self) -> Dict[str, Any]:
+        """Convert to base DataItem with appropriate metadata"""
+        meta_data = self.meta_data or {}
+        if self.turn_id is not None:
+            meta_data["turn_id"] = self.turn_id
+        if self.user_id is not None:
+            meta_data["user_id"] = self.user_id
+        if self.turn_text is not None:
+            meta_data["turn_text"] = self.turn_text
+        if self.timestamp is not None:
+            meta_data["timestamp"] = self.timestamp
+        if self.reply_to_turn is not None:
+            meta_data["reply_to_turn"] = self.reply_to_turn
+            
+        return {
+            "container_id": self.container_id,
+            "content": self.content if self.content else (self.turn_text or ""),
+            "type": self.type,
+            "meta_data": meta_data
+        }
 
 
 class AnnotationCreate(AnnotationBase):
@@ -136,7 +177,6 @@ class DataContainer(DataContainerBase):
 class DataItem(DataItemBase):
     id: int
     container_id: int
-    type: str
     created_at: datetime
 
     # Helper properties for backward compatibility
@@ -155,24 +195,15 @@ class DataItem(DataItemBase):
     @property
     def source(self) -> Optional[str]:
         return self.meta_data.get("source")
-
-    class Config:
-        from_attributes = True
-
-
-class ImportedData(DataItem):
-    class Config:
-        from_attributes = True
-
-
-class ChatMessage(DataItem):
+        
+    # Chat message fields
     @property
-    def turn_id(self) -> str:
-        return str(self.meta_data.get("turn_id", self.id))
+    def turn_id(self) -> Optional[str]:
+        return self.meta_data.get("turn_id")
     
     @property
-    def user_id(self) -> str:
-        return str(self.meta_data.get("user_id", "unknown"))
+    def user_id(self) -> Optional[str]:
+        return self.meta_data.get("user_id")
     
     @property
     def turn_text(self) -> Optional[str]:
@@ -186,6 +217,16 @@ class ChatMessage(DataItem):
     def timestamp(self) -> Optional[datetime]:
         return self.meta_data.get("timestamp")
 
+    class Config:
+        from_attributes = True
+
+
+class ImportedData(DataItem):
+    class Config:
+        from_attributes = True
+
+
+class ChatMessage(DataItem):
     class Config:
         from_attributes = True
 

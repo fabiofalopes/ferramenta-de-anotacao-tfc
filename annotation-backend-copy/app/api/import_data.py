@@ -17,6 +17,15 @@ from ..config import get_project_type
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+def create_data_item(container_id, content, metadata, data_type):
+    """Helper function to create a DataItem with the right type and metadata"""
+    return DataItem.create(
+        type_name=data_type,
+        container_id=container_id,
+        content=content,
+        meta_data=metadata
+    )
+
 @router.post("/import", response_model=ImportStatus)
 async def import_data(
     file: UploadFile = File(...),
@@ -232,12 +241,12 @@ async def process_csv_import(file, container, config: CSVImportRequest, db, curr
                 content = ""  # Use empty string as fallback
                 warnings.append(f"Row {idx}: Empty content value")
             
-            # Create the data item
-            data_item = DataItem(
-                container_id=container.id, 
+            # Create the data item using our helper function
+            data_item = create_data_item(
+                container_id=container.id,
                 content=str(content),
-                meta_data=metadata,
-                type=config.data_type
+                metadata=metadata,
+                data_type=config.data_type
             )
             db.add(data_item)
             
@@ -252,29 +261,26 @@ async def process_csv_import(file, container, config: CSVImportRequest, db, curr
             errors.append(f"Error processing row {idx}: {str(e)}")
             logger.error(f"Error processing row {idx}: {str(e)}")
     
-    # Final commit
+    # Final commit of any pending items
     await db.commit()
     
     # Update container status
-    container.status = "completed" if not errors else "completed_with_errors"
+    container.status = "completed"
     container.meta_data = {
         **container.meta_data,
-        "stats": {
-            "total_rows": total_rows,
-            "processed_rows": processed,
-            "error_count": len(errors),
-            "warning_count": len(warnings)
-        }
+        "total_items": processed,
+        "completed_at": datetime.now().isoformat()
     }
     await db.commit()
-    logger.info(f"Import completed: {processed}/{total_rows} rows processed")
+    
+    logger.info(f"Import completed: {processed} items imported")
     
     return ImportStatus(
         id=str(container.id),
-        status=container.status,
+        status="completed",
         progress=1.0,
         total_rows=total_rows,
         processed_rows=processed,
-        errors=errors[:20],  # Limit to first 20 errors
-        warnings=warnings[:20]  # Limit to first 20 warnings
+        errors=errors,
+        warnings=warnings
     ) 
