@@ -26,20 +26,14 @@ export async function importCSV(
   const importConfig = {
     project_id: projectId,
     container_name: containerName,
-    import_type: 'generic',
-    column_mapping: {
-      content: columnMapping.content, // Required field for main content
-      type: columnMapping.type, // Optional field for item type
-      metadata: {} as Record<string, string> // Additional metadata mappings
-    }
+    import_type: 'chat',
+    data_type: 'chat_message',
+    field_mapping: Object.entries(columnMapping).map(([source_field, target_field]) => ({
+      source_field,
+      target_field,
+      default_value: null
+    }))
   };
-  
-  // Add additional metadata mappings
-  Object.entries(columnMapping).forEach(([fieldName, columnName]) => {
-    if (fieldName !== 'content' && fieldName !== 'type') {
-      importConfig.column_mapping.metadata[fieldName] = columnName;
-    }
-  });
   
   // Add config to form data
   const importConfigStr = JSON.stringify(importConfig);

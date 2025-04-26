@@ -309,7 +309,7 @@ export function ImportPage() {
         form.reset();
         setActiveStep(0);
     };
-    
+
     return (
         <Stack gap="lg" style={{ width: '100%' }}>
             <Paper p="md" radius="sm" withBorder>

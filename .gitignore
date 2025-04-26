@@ -2,3 +2,4 @@ venv/
 uploads/
 prompts/
 __pycache__/
+#annotation-backend-copy/app/__pycache__/

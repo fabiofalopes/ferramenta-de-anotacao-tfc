@@ -1,0 +1,19 @@
+services:
+  web:
+    build: .
+    ports:
+      - "8001:8000"
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///./annotation.db
+      - SECRET_KEY=your-secret-key-here-change-in-production
+      - FIRST_ADMIN_EMAIL=admin@example.com
+      - FIRST_ADMIN_PASSWORD=admin
+      - CORS_ORIGINS=["http://localhost:3000"]
+    volumes:
+      - .:/app
+    networks:
+      - annotation-network
+
+networks:
+  annotation-network:
+    driver: bridge 

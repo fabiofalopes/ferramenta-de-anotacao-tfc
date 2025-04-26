@@ -6,11 +6,10 @@ pydantic-settings==2.1.0
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 python-multipart==0.0.9
-asyncpg==0.29.0  # PostgreSQL async driver
+aiosqlite==0.19.0  # SQLite async driver
 python-dotenv==1.0.1
 pandas==2.2.0  # For CSV import functionality
 alembic==1.13.1
-psycopg2-binary==2.9.9 
 requests
-sqlalchemy_schemadisplay==2.0
-graphviz==0.20.1
+httpx==0.26.0  # For testing API endpoints
+rich>=13.0.0

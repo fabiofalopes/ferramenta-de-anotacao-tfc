@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { TextInput, PasswordInput, Button, Paper, Title, Container, Text, Box, Anchor, Checkbox } from '@mantine/core';
+import { TextInput, PasswordInput, Button, Paper, Title, Container, Text, Box, Anchor } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { useAuth } from '../contexts/AuthContext';
@@ -20,7 +20,6 @@ export function RegisterPage() {
       email: '',
       password: '',
       confirmPassword: '',
-      isAdmin: false,
     },
     validate: {
       email: (value) => (/^\S+@\S+$/.test(value) ? null : 'Invalid email'),
@@ -34,17 +33,16 @@ export function RegisterPage() {
     email: string; 
     password: string; 
     confirmPassword: string;
-    isAdmin: boolean;
   }) => {
     setIsLoading(true);
     console.log("Submitting registration form with values:", {...values, password: "[REDACTED]"});
 
     try {
-      // Register the user
+      // Register the user - always as non-admin
       await registerUser({
         email: values.email,
         password: values.password,
-        is_admin: values.isAdmin
+        is_admin: false
       });
 
       console.log("Registration successful, now logging in");
@@ -107,12 +105,6 @@ export function RegisterPage() {
             required
             mt="md"
             {...form.getInputProps('confirmPassword')}
-          />
-
-          <Checkbox
-            label="Register as administrator"
-            mt="md"
-            {...form.getInputProps('isAdmin', { type: 'checkbox' })}
           />
 
           <Box mt="xl">
